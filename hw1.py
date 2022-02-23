@@ -2,7 +2,7 @@ import timeit
 
 import numpy as np
 
-from matplotlib import pyplot as plt
+# from matplotlib import pyplot as plt
 
 from pandas import read_csv
 from pandas import DataFrame
