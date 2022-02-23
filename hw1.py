@@ -108,11 +108,11 @@ Manual Implementation
 
 '''
 
-#gamma matrix calculation
+# gamma matrix calculation
 
 
 def Z(X, y=None):
-    #assume that X is an n x d dataset (n rows of observations, d columns of features) and Y (output) is the last column in dataset
+    # assume that X is an n x d dataset (n rows of observations, d columns of features) and Y (output) is the last column in dataset
     Z = X.copy().T
     row_1 = np.ones(Z.shape[1])
     row_y = y.T[0] if y is not None else np.zeros(Z.shape[1])
@@ -150,7 +150,7 @@ def Q(gamma):
     return gamma[1:d+1, 1:d+1]
 
 
-#if working in chunks, intermediate gammas should be d x d in size according to paper.
+# if working in chunks, intermediate gammas should be d x d in size according to paper.
 def update_gamma(old_gamma, new_gamma):
     return np.add(old_gamma, new_gamma)
 
@@ -286,6 +286,8 @@ chunks = read_csv(PATH, chunksize=BATCH_SIZE)
 
 gamma_final = np.array([])
 
+start_time = timeit.default_timer()
+
 for chunk in chunks:
     X, y_chunk = chunk.iloc[:, 1:-1].to_numpy(), chunk.iloc[:, [-1]].to_numpy()
 
@@ -301,8 +303,6 @@ for chunk in chunks:
 print('Performing PCA from gamma...')
 
 ev_treshold = 1.00
-
-start_time = timeit.default_timer()
 
 pca_U = pca(gamma_final, ev_threshold=ev_treshold)
 
@@ -349,32 +349,35 @@ results['gamma_kmeans_predictions'] = predictions
 print('\n\n## RESULTS ##\n\n')
 
 # PCA
-print('PCA: \n')
-print('Time taken by built-in PCA: ', results['builtin_pca_time'])
-print('Time taken by gamma-based PCA: ', results['gamma_pca_time'])
+if results['builtin_pca_time'] and results['gamma_pca_time']:
+    print('PCA: \n')
+    print('Time taken by built-in PCA: ', results['builtin_pca_time'])
+    print('Time taken by gamma-based PCA: ', results['gamma_pca_time'])
 
-print('\n')
+    print('\n')
 
-# Built-in LR
-print('Built-in Logistic Regression: \n')
-print('Time taken by built-in Logistic Regression: ',
-      results['builtin_lr_time'])
-print('Accuracy of built-in Logistic Regression: ',
-      results['builtin_lr_accuracy'])
-print('Confusion Matrix of built-in Logistic Regression: ')
-print(confusion_matrix(y_test.values, results['builtin_lr_predictions']))
-# ConfusionMatrixDisplay.from_predictions(
-#     y_test.values, results['builtin_lr_predictions'])
-# plt.show()
+if results['builtin_lr_time'] and results['gamma_kmeans_time']:
+    # Built-in LR
+    print('Built-in Logistic Regression: \n')
+    print('Time taken by built-in Logistic Regression: ',
+          results['builtin_lr_time'])
+    print('Accuracy of built-in Logistic Regression: ',
+          results['builtin_lr_accuracy'])
+    print('Confusion Matrix of built-in Logistic Regression: ')
+    print(confusion_matrix(y_test.values, results['builtin_lr_predictions']))
+    # ConfusionMatrixDisplay.from_predictions(
+    #     y_test.values, results['builtin_lr_predictions'])
+    # plt.show()
 
-print('\n')
+    print('\n')
 
-# Gamma-based K-Means
-print('Gamma-based K-Means: \n')
-print('Time taken by gamma-based K-Means: ', results['gamma_kmeans_time'])
-print('Accuracy of gamma-based K-Means: ', results['gamma_kmeans_accuracy'])
-print('Confusion Matrix of gamma-based K-Means: ')
-print(confusion_matrix(y_test.values, results['gamma_kmeans_predictions']))
-# ConfusionMatrixDisplay.from_predictions(
-#     y_test.values, results['gamma_kmeans_predictions'])
-# plt.show()
+    # Gamma-based K-Means
+    print('Gamma-based K-Means: \n')
+    print('Time taken by gamma-based K-Means: ', results['gamma_kmeans_time'])
+    print('Accuracy of gamma-based K-Means: ',
+          results['gamma_kmeans_accuracy'])
+    print('Confusion Matrix of gamma-based K-Means: ')
+    print(confusion_matrix(y_test.values, results['gamma_kmeans_predictions']))
+    # ConfusionMatrixDisplay.from_predictions(
+    #     y_test.values, results['gamma_kmeans_predictions'])
+    # plt.show()
