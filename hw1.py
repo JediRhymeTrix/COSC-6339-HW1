@@ -21,9 +21,31 @@ from sklearn.exceptions import DataConversionWarning
 warnings.filterwarnings(
     "ignore", category=DataConversionWarning)
 
+import argparse
+import sys
+from os.path import exists
+
+#command-line arguments
+arguments = []
+
+for argument in sys.argv[1:]:
+    arguments.append(argument.split("--")[1])
+    if '=' in argument:
+        filename = argument.split("--")[1].split("=")[1]
+
+if 'dimred' not in arguments and 'classify' not in arguments:
+    print("Please use either --dimred or --classify to run the program")
+    sys.exit(1)
 
 # constants
-PATH = './data/cancer_1M.csv'
+file_exists = exists(filename)
+if file_exists:
+    PATH = filename
+else:
+    PATH = ""
+    print("Please enter a valid file path")
+    sys.exit(1)
+
 BATCH_SIZE = 5000
 
 results = {}
@@ -278,68 +300,69 @@ def predict(X, model):
 
     return predictions
 
+if 'dimred' in arguments:
+    # loading data and computing gamma
+    print('Computing gamma for PCA...')
 
-# loading data and computing gamma
-print('Computing gamma for PCA...')
+    chunks = read_csv(PATH, chunksize=BATCH_SIZE)
 
-chunks = read_csv(PATH, chunksize=BATCH_SIZE)
+    gamma_final = np.array([])
 
-gamma_final = np.array([])
+    start_time = timeit.default_timer()
 
-start_time = timeit.default_timer()
+    for chunk in chunks:
+        X, y_chunk = chunk.iloc[:, 1:-1].to_numpy(), chunk.iloc[:, [-1]].to_numpy()
 
-for chunk in chunks:
-    X, y_chunk = chunk.iloc[:, 1:-1].to_numpy(), chunk.iloc[:, [-1]].to_numpy()
+        gamma_chunk = gamma(X, y_chunk)
+        gamma_final = gamma_final if gamma_final.size else np.zeros(
+            gamma_chunk.shape)
+        gamma_final = update_gamma(gamma_final, gamma_chunk)
 
-    gamma_chunk = gamma(X, y_chunk)
-    gamma_final = gamma_final if gamma_final.size else np.zeros(
-        gamma_chunk.shape)
-    gamma_final = update_gamma(gamma_final, gamma_chunk)
+    # print(gamma_final.shape)
+    # print(gamma_final)
 
-# print(gamma_final.shape)
-# print(gamma_final)
+    # computing PCA
+    print('Performing PCA from gamma...')
 
-# computing PCA
-print('Performing PCA from gamma...')
+    ev_treshold = 1.00
 
-ev_treshold = 1.00
+    pca_U = pca(gamma_final, ev_threshold=ev_treshold)
 
-pca_U = pca(gamma_final, ev_threshold=ev_treshold)
+    # print(pca_U.shape)
 
-# print(pca_U.shape)
+    # dimensionality reduction
+    pca_X = dim_reduction(scaled, pca_U)
+    pca_df_X = DataFrame(pca_X)
 
-# dimensionality reduction
-pca_X = dim_reduction(scaled, pca_U)
-pca_df_X = DataFrame(pca_X)
+    results['gamma_pca_time'] = timeit.default_timer() - start_time
 
-results['gamma_pca_time'] = timeit.default_timer() - start_time
+    # print(pca_df_X.shape)
+    # print(pca_df_X.describe)
 
-# print(pca_df_X.shape)
-# print(pca_df_X.describe)
+if 'classify' in arguments:
+    # training
+    K = 5
+    num_iters = 1
 
-# training
-K = 5
-num_iters = 1
+    print(f'Fitting K-Means (K={K} {num_iters} iterations)...')
 
-print(f'Fitting K-Means (K={K} {num_iters} iterations)...')
+    X_train, X_test, y_train, y_test = train_test_split(
+        pca_df_X, y, test_size=0.20, random_state=0)
 
-X_train, X_test, y_train, y_test = train_test_split(
-    pca_df_X, y, test_size=0.20, random_state=0)
+    start_time = timeit.default_timer()
 
-start_time = timeit.default_timer()
+    # @TODO: tune these parameters
+    model = fit(X_train, y_train, K=5, max_iters=num_iters)
 
-# @TODO: tune these parameters
-model = fit(X_train, y_train, K=5, max_iters=num_iters)
+    results['gamma_kmeans_time'] = timeit.default_timer() - start_time
 
-results['gamma_kmeans_time'] = timeit.default_timer() - start_time
+    # evaluation
+    print('Evaluating K-Means...')
 
-# evaluation
-print('Evaluating K-Means...')
+    predictions = predict(X_test, model)
 
-predictions = predict(X_test, model)
-
-results['gamma_kmeans_accuracy'] = accuracy_score(y_test, predictions)
-results['gamma_kmeans_predictions'] = predictions
+    results['gamma_kmeans_accuracy'] = accuracy_score(y_test, predictions)
+    results['gamma_kmeans_predictions'] = predictions
 
 # ConfusionMatrixDisplay.from_predictions(y_test.values, predictions)
 # print(f"Accuracy = {accuracy_score(y_test.values, predictions)}")
@@ -349,14 +372,14 @@ results['gamma_kmeans_predictions'] = predictions
 print('\n\n## RESULTS ##\n\n')
 
 # PCA
-if results['builtin_pca_time'] and results['gamma_pca_time']:
+if 'dimred' in arguments and results['builtin_pca_time'] and results['gamma_pca_time']:
     print('PCA: \n')
     print('Time taken by built-in PCA: ', results['builtin_pca_time'])
     print('Time taken by gamma-based PCA: ', results['gamma_pca_time'])
 
     print('\n')
 
-if results['builtin_lr_time'] and results['gamma_kmeans_time']:
+if 'classify' in arguments and results['builtin_lr_time'] and results['gamma_kmeans_time']:
     # Built-in LR
     print('Built-in Logistic Regression: \n')
     print('Time taken by built-in Logistic Regression: ',
@@ -381,3 +404,5 @@ if results['builtin_lr_time'] and results['gamma_kmeans_time']:
     # ConfusionMatrixDisplay.from_predictions(
     #     y_test.values, results['gamma_kmeans_predictions'])
     # plt.show()
+
+
