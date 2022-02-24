@@ -34,7 +34,7 @@ for argument in sys.argv[1:]:
         filename = argument.split("--")[1].split("=")[1]
 
 if 'dimred' not in arguments and 'classify' not in arguments:
-    print("Please use either --dimred or --classify to run the program")
+    print("Please pass the dataset as --input=<path_to_data> and use either --dimred or --classify (or both) to run the program")
     sys.exit(1)
 
 # constants
