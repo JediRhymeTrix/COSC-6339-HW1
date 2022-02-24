@@ -21,9 +21,50 @@ from sklearn.exceptions import DataConversionWarning
 warnings.filterwarnings(
     "ignore", category=DataConversionWarning)
 
+import argparse
+import sys
+from os.path import exists
+
+#command-line arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('arguments', metavar='P', type=str, nargs='+', help='arguments')
+args = parser.parse_args()
+
+# print(args.arguments[0])
+arguments = args.arguments[0].split(";")
+# print(arguments)
+tasks = {}
+
+for argument in arguments:
+    tasks[argument.split("=")[0]] = argument.split("=")[1]
+
+# print(tasks)
+
+if 'task' not in tasks:
+    print("No task selected")
+    sys.exit(1)
+
+if tasks['task'] != 'dimred':
+    print("Wrong task selected")
+    sys.exit(1)
+
+if 'model' not in tasks:
+    print("No model selected")
+    sys.exit(1)
+
+if tasks['model'] not in ['pca', 'kmeans']:
+    print("Wrong model selected")
+    sys.exit(1)
 
 # constants
-PATH = './data/cancer_1M.csv'
+file_exists = exists(tasks['input'])
+if file_exists:
+    PATH = tasks['input']
+else:
+    PATH = ""
+    print("Please enter a valid file path")
+    sys.exit(1)
+
 BATCH_SIZE = 5000
 
 results = {}
@@ -317,29 +358,30 @@ results['gamma_pca_time'] = timeit.default_timer() - start_time
 # print(pca_df_X.shape)
 # print(pca_df_X.describe)
 
-# training
-K = 5
-num_iters = 1
+if tasks['model'] == 'kmeans':
+    # training
+    K = 5
+    num_iters = 1
 
-print(f'Fitting K-Means (K={K} {num_iters} iterations)...')
+    print(f'Fitting K-Means (K={K} {num_iters} iterations)...')
 
-X_train, X_test, y_train, y_test = train_test_split(
-    pca_df_X, y, test_size=0.20, random_state=0)
+    X_train, X_test, y_train, y_test = train_test_split(
+        pca_df_X, y, test_size=0.20, random_state=0)
 
-start_time = timeit.default_timer()
+    start_time = timeit.default_timer()
 
-# @TODO: tune these parameters
-model = fit(X_train, y_train, K=5, max_iters=num_iters)
+    # @TODO: tune these parameters
+    model = fit(X_train, y_train, K=5, max_iters=num_iters)
 
-results['gamma_kmeans_time'] = timeit.default_timer() - start_time
+    results['gamma_kmeans_time'] = timeit.default_timer() - start_time
 
-# evaluation
-print('Evaluating K-Means...')
+    # evaluation
+    print('Evaluating K-Means...')
 
-predictions = predict(X_test, model)
+    predictions = predict(X_test, model)
 
-results['gamma_kmeans_accuracy'] = accuracy_score(y_test, predictions)
-results['gamma_kmeans_predictions'] = predictions
+    results['gamma_kmeans_accuracy'] = accuracy_score(y_test, predictions)
+    results['gamma_kmeans_predictions'] = predictions
 
 # ConfusionMatrixDisplay.from_predictions(y_test.values, predictions)
 # print(f"Accuracy = {accuracy_score(y_test.values, predictions)}")
@@ -356,7 +398,7 @@ if results['builtin_pca_time'] and results['gamma_pca_time']:
 
     print('\n')
 
-if results['builtin_lr_time'] and results['gamma_kmeans_time']:
+if tasks['model'] == 'kmeans' and results['builtin_lr_time'] and results['gamma_kmeans_time']:
     # Built-in LR
     print('Built-in Logistic Regression: \n')
     print('Time taken by built-in Logistic Regression: ',
