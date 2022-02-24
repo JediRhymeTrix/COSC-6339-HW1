@@ -26,40 +26,21 @@ import sys
 from os.path import exists
 
 #command-line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument('arguments', metavar='P', type=str, nargs='+', help='arguments')
-args = parser.parse_args()
+arguments = []
 
-# print(args.arguments[0])
-arguments = args.arguments[0].split(";")
-# print(arguments)
-tasks = {}
+for argument in sys.argv[1:]:
+    arguments.append(argument.split("--")[1])
+    if '=' in argument:
+        filename = argument.split("--")[1].split("=")[1]
 
-for argument in arguments:
-    tasks[argument.split("=")[0]] = argument.split("=")[1]
-
-# print(tasks)
-
-if 'task' not in tasks:
-    print("No task selected")
-    sys.exit(1)
-
-if tasks['task'] != 'dimred':
-    print("Wrong task selected")
-    sys.exit(1)
-
-if 'model' not in tasks:
-    print("No model selected")
-    sys.exit(1)
-
-if tasks['model'] not in ['pca', 'kmeans']:
-    print("Wrong model selected")
+if 'dimred' not in arguments and 'classify' not in arguments:
+    print("Please use either --dimred or --classify to run the program")
     sys.exit(1)
 
 # constants
-file_exists = exists(tasks['input'])
+file_exists = exists(filename)
 if file_exists:
-    PATH = tasks['input']
+    PATH = filename
 else:
     PATH = ""
     print("Please enter a valid file path")
@@ -319,46 +300,46 @@ def predict(X, model):
 
     return predictions
 
+if 'dimred' in arguments:
+    # loading data and computing gamma
+    print('Computing gamma for PCA...')
 
-# loading data and computing gamma
-print('Computing gamma for PCA...')
+    chunks = read_csv(PATH, chunksize=BATCH_SIZE)
 
-chunks = read_csv(PATH, chunksize=BATCH_SIZE)
+    gamma_final = np.array([])
 
-gamma_final = np.array([])
+    start_time = timeit.default_timer()
 
-start_time = timeit.default_timer()
+    for chunk in chunks:
+        X, y_chunk = chunk.iloc[:, 1:-1].to_numpy(), chunk.iloc[:, [-1]].to_numpy()
 
-for chunk in chunks:
-    X, y_chunk = chunk.iloc[:, 1:-1].to_numpy(), chunk.iloc[:, [-1]].to_numpy()
+        gamma_chunk = gamma(X, y_chunk)
+        gamma_final = gamma_final if gamma_final.size else np.zeros(
+            gamma_chunk.shape)
+        gamma_final = update_gamma(gamma_final, gamma_chunk)
 
-    gamma_chunk = gamma(X, y_chunk)
-    gamma_final = gamma_final if gamma_final.size else np.zeros(
-        gamma_chunk.shape)
-    gamma_final = update_gamma(gamma_final, gamma_chunk)
+    # print(gamma_final.shape)
+    # print(gamma_final)
 
-# print(gamma_final.shape)
-# print(gamma_final)
+    # computing PCA
+    print('Performing PCA from gamma...')
 
-# computing PCA
-print('Performing PCA from gamma...')
+    ev_treshold = 1.00
 
-ev_treshold = 1.00
+    pca_U = pca(gamma_final, ev_threshold=ev_treshold)
 
-pca_U = pca(gamma_final, ev_threshold=ev_treshold)
+    # print(pca_U.shape)
 
-# print(pca_U.shape)
+    # dimensionality reduction
+    pca_X = dim_reduction(scaled, pca_U)
+    pca_df_X = DataFrame(pca_X)
 
-# dimensionality reduction
-pca_X = dim_reduction(scaled, pca_U)
-pca_df_X = DataFrame(pca_X)
+    results['gamma_pca_time'] = timeit.default_timer() - start_time
 
-results['gamma_pca_time'] = timeit.default_timer() - start_time
+    # print(pca_df_X.shape)
+    # print(pca_df_X.describe)
 
-# print(pca_df_X.shape)
-# print(pca_df_X.describe)
-
-if tasks['model'] == 'kmeans':
+if 'classify' in arguments:
     # training
     K = 5
     num_iters = 1
@@ -391,14 +372,14 @@ if tasks['model'] == 'kmeans':
 print('\n\n## RESULTS ##\n\n')
 
 # PCA
-if results['builtin_pca_time'] and results['gamma_pca_time']:
+if 'dimred' in arguments and results['builtin_pca_time'] and results['gamma_pca_time']:
     print('PCA: \n')
     print('Time taken by built-in PCA: ', results['builtin_pca_time'])
     print('Time taken by gamma-based PCA: ', results['gamma_pca_time'])
 
     print('\n')
 
-if tasks['model'] == 'kmeans' and results['builtin_lr_time'] and results['gamma_kmeans_time']:
+if 'classify' in arguments and results['builtin_lr_time'] and results['gamma_kmeans_time']:
     # Built-in LR
     print('Built-in Logistic Regression: \n')
     print('Time taken by built-in Logistic Regression: ',
@@ -423,3 +404,5 @@ if tasks['model'] == 'kmeans' and results['builtin_lr_time'] and results['gamma_
     # ConfusionMatrixDisplay.from_predictions(
     #     y_test.values, results['gamma_kmeans_predictions'])
     # plt.show()
+
+
