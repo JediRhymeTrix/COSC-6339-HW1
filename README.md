@@ -23,10 +23,10 @@ Vohra, Vedant 2889
 
 ## Dataset
 
-`cancer_1m.csv`
+`cancer_1M.csv`
 
 ## How to run the program
 
 ```bash
-python3 hw1.py --input=./data/cancer_1m.csv --dimred --classify
+python3 hw1.py --input=./data/cancer_1M.csv --dimred --classify
 ```
